@@ -54,7 +54,7 @@ local freecamPart
 local rotationX = 0
 local rotationY = 0
 local rotationZ = 0
-local activeTouch = nil
+local activeInput = nil
 local lastPos = nil
 local speed = 1
 
@@ -104,8 +104,7 @@ local function applyTextbox()
 end
 
 local function isInsideGui(pos)
-	local guiObjects = gui:GetDescendants()
-	for _,obj in ipairs(guiObjects) do
+	for _,obj in ipairs(gui:GetDescendants()) do
 		if obj:IsA("GuiObject") then
 			local abs = obj.AbsolutePosition
 			local size = obj.AbsoluteSize
@@ -117,31 +116,31 @@ local function isInsideGui(pos)
 	return false
 end
 
-local function startTouch(id,pos)
-	if activeTouch then return end
+local function startDrag(input)
+	if activeInput then return end
+	local pos = input.Position
 	if isInsideGui(Vector2.new(pos.X,pos.Y)) then return end
-	activeTouch = id
+	activeInput = input
 	lastPos = Vector2.new(pos.X,pos.Y)
 end
 
-local function moveTouch(id,pos)
-	if id ~= activeTouch or not lastPos then return end
-	local p = Vector2.new(pos.X,pos.Y)
-	local d = p - lastPos
-	rotationY = clamp(rotationY - d.X * 0.3)
-	rotationX = math.clamp(rotationX - d.Y * 0.3,-89,89)
-	lastPos = p
+local function moveDrag(input)
+	if input ~= activeInput or not lastPos then return end
+	local pos = Vector2.new(input.Position.X,input.Position.Y)
+	local delta = pos - lastPos
+	rotationY = clamp(rotationY - delta.X * 0.3)
+	rotationX = math.clamp(rotationX - delta.Y * 0.3,-89,89)
+	lastPos = pos
 end
 
-local function endTouch(id)
-	if id == activeTouch then
-		activeTouch = nil
+local function endDrag(input)
+	if input == activeInput then
+		activeInput = nil
 		lastPos = nil
 	end
 end
 
 toggle.MouseButton1Click:Connect(function()
-
 	if db then
 		db = false
 		toggle.Text = "Off"
@@ -190,28 +189,34 @@ toggle.MouseButton1Click:Connect(function()
 	right.MouseButton1Down:Connect(function() moving.Right=true end)
 	right.MouseButton1Up:Connect(function() moving.Right=false end)
 
-	makeTextbox(sliderX,UDim2.new(0.85,0,0.30,0))
-	makeTextbox(sliderY,UDim2.new(0.85,0,0.40,0))
-	makeTextbox(sliderZ,UDim2.new(0.85,0,0.50,0))
+	makeTextbox(sliderX,UDim2.new(0,10,0,200))
+	makeTextbox(sliderY,UDim2.new(0,10,0,240))
+	makeTextbox(sliderZ,UDim2.new(0,10,0,280))
 
-	makeLabel(labelX,"X",UDim2.new(0.80,0,0.30,0))
-	makeLabel(labelY,"Y",UDim2.new(0.80,0,0.40,0))
-	makeLabel(labelZ,"Z",UDim2.new(0.80,0,0.50,0))
+	makeLabel(labelX,"X",UDim2.new(0,95,0,200))
+	makeLabel(labelY,"Y",UDim2.new(0,95,0,240))
+	makeLabel(labelZ,"Z",UDim2.new(0,95,0,280))
 
 	sliderX.FocusLost:Connect(applyTextbox)
 	sliderY.FocusLost:Connect(applyTextbox)
 	sliderZ.FocusLost:Connect(applyTextbox)
 
-	uis.TouchStarted:Connect(function(t)
-		startTouch(t.TouchId,t.Position)
+	uis.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch then
+			startDrag(input)
+		end
 	end)
 
-	uis.TouchMoved:Connect(function(t)
-		moveTouch(t.TouchId,t.Position)
+	uis.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch then
+			moveDrag(input)
+		end
 	end)
 
-	uis.TouchEnded:Connect(function(t)
-		endTouch(t.TouchId)
+	uis.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch then
+			endDrag(input)
+		end
 	end)
 
 	rs:BindToRenderStep("FreecamMove",Enum.RenderPriority.Camera.Value,function()
@@ -235,7 +240,7 @@ toggle.MouseButton1Click:Connect(function()
 
 		if not sliderX:IsFocused() then sliderX.Text = tostring(math.floor(rotationX)) end
 		if not sliderY:IsFocused() then sliderY.Text = tostring(math.floor(rotationY)) end
-		if not sliderZ:IsFocused() then sliderZ.Text = tostring(math.floor(rotationZ)) end
+        if not sliderZ:IsFocused() then sliderZ.Text = tostring(math.floor(rotationZ)) end
 	end)
 end)
 
