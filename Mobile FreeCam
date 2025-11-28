@@ -1,0 +1,212 @@
+local gui = Instance.new("ScreenGui")
+gui.Name = "FreecamGUI"
+gui.ResetOnSpawn = false
+gui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+local toggle = Instance.new("TextButton")
+toggle.Name = "Toggle"
+toggle.Size = UDim2.new(0,120,0,40)
+toggle.Position = UDim2.new(0,10,0,10)
+toggle.BackgroundColor3 = Color3.fromRGB(255,255,255)
+toggle.BackgroundTransparency = 0.2
+toggle.Text = "Off"
+toggle.Parent = gui
+
+local kill = Instance.new("TextButton")
+kill.Name = "KillSwitch"
+kill.Size = UDim2.new(0,120,0,40)
+kill.Position = UDim2.new(0,10,0,60)
+kill.BackgroundColor3 = Color3.fromRGB(255,50,50)
+kill.BackgroundTransparency = 0.2
+kill.Text = "Kill"
+kill.Parent = gui
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(1,0)
+toggleCorner.Parent = toggle
+
+local killCorner = Instance.new("UICorner")
+killCorner.CornerRadius = UDim.new(1,0)
+killCorner.Parent = kill
+
+local db = false
+local cam = workspace.CurrentCamera
+local rs = game:GetService("RunService")
+local uis = game:GetService("UserInputService")
+local moving = {Up=false,Down=false,Left=false,Right=false}
+
+local up = Instance.new("TextButton")
+local down = Instance.new("TextButton")
+local left = Instance.new("TextButton")
+local right = Instance.new("TextButton")
+
+local sliderX = Instance.new("Frame")
+local sliderY = Instance.new("Frame")
+local sliderZ = Instance.new("Frame")
+local handleX = Instance.new("Frame")
+local handleY = Instance.new("Frame")
+local handleZ = Instance.new("Frame")
+
+local labelX = Instance.new("TextLabel")
+local labelY = Instance.new("TextLabel")
+local labelZ = Instance.new("TextLabel")
+
+local drag = {X=false,Y=false,Z=false}
+local rotation = {X=0,Y=0,Z=0}
+local speed = 1
+local freecamPart = nil
+
+local function round(btn)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(1,0)
+	c.Parent = btn
+end
+
+local function makeButton(btn,text,pos)
+	btn.Text = text
+	btn.BackgroundColor3 = Color3.fromRGB(255,255,255)
+	btn.BackgroundTransparency = 0.4
+	btn.Size = UDim2.new(0.1,0,0.1,0)
+	btn.Position = pos
+	btn.Parent = gui
+	round(btn)
+end
+
+local function makeSlider(frame,handle,label,pos)
+	frame.Size = UDim2.new(0.28,0,0.04,0)
+	frame.BackgroundTransparency = 0.3
+	frame.BackgroundColor3 = Color3.fromRGB(190,190,190)
+	frame.Position = pos
+	frame.Parent = gui
+	handle.Size = UDim2.new(0.05,0,1,0)
+	handle.Position = UDim2.new(0,0,0,0)
+	handle.BackgroundColor3 = Color3.fromRGB(255,255,255)
+	handle.Parent = frame
+	label.Size = UDim2.new(0,20,0,20)
+	label.Position = UDim2.new(-0.12,0,0,0)
+	label.BackgroundTransparency = 1
+	label.TextColor3 = Color3.fromRGB(255,255,255)
+	label.Font = Enum.Font.SourceSans
+	label.TextSize = 20
+	label.Parent = frame
+end
+
+local function connectSlider(frame,handle,axis)
+	handle.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 then
+			drag[axis] = true
+		end
+	end)
+	uis.InputEnded:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 then
+			drag[axis] = false
+		end
+	end)
+	uis.InputChanged:Connect(function(i)
+		if drag[axis] and i.UserInputType == Enum.UserInputType.MouseMovement then
+			local rel = math.clamp(i.Position.X - frame.AbsolutePosition.X,0,frame.AbsoluteSize.X)
+			local pct = rel / frame.AbsoluteSize.X
+			handle.Position = UDim2.new(pct,0,0,0)
+			rotation[axis] = pct * 360
+			if freecamPart then
+				freecamPart.CFrame = CFrame.new(freecamPart.Position)
+					* CFrame.Angles(
+						math.rad(rotation.X),
+						math.rad(rotation.Y),
+						math.rad(rotation.Z)
+					)
+			end
+		end
+	end)
+end
+
+toggle.MouseButton1Click:Connect(function()
+	if not db then
+		db = true
+		toggle.Text = "On"
+
+		freecamPart = Instance.new("Part")
+		freecamPart.Size = Vector3.new(1,1,1)
+		freecamPart.Anchored = true
+		freecamPart.Transparency = 1
+		freecamPart.CanCollide = false
+		freecamPart.CFrame = cam.CFrame
+		freecamPart.Parent = workspace
+
+		rotation = {X=0,Y=0,Z=0}
+		cam.CameraType = Enum.CameraType.Scriptable
+
+		makeButton(up,"Up",UDim2.new(0.1,0,0.5,0))
+		makeButton(down,"Down",UDim2.new(0.1,0,0.7,0))
+		makeButton(left,"Left",UDim2.new(0.05,0,0.6,0))
+		makeButton(right,"Right",UDim2.new(0.15,0,0.6,0))
+
+		makeSlider(sliderX,handleX,labelX,UDim2.new(0.07,0,0.30,0))
+		makeSlider(sliderY,handleY,labelY,UDim2.new(0.07,0,0.36,0))
+		makeSlider(sliderZ,handleZ,labelZ,UDim2.new(0.07,0,0.42,0))
+
+		labelX.Text = "X"
+		labelY.Text = "Y"
+		labelZ.Text = "Z"
+
+		connectSlider(sliderX,handleX,"X")
+		connectSlider(sliderY,handleY,"Y")
+		connectSlider(sliderZ,handleZ,"Z")
+
+		up.MouseButton1Down:Connect(function() moving.Up=true end)
+		up.MouseButton1Up:Connect(function() moving.Up=false end)
+		down.MouseButton1Down:Connect(function() moving.Down=true end)
+		down.MouseButton1Up:Connect(function() moving.Down=false end)
+		left.MouseButton1Down:Connect(function() moving.Left=true end)
+		left.MouseButton1Up:Connect(function() moving.Left=false end)
+		right.MouseButton1Down:Connect(function() moving.Right=true end)
+		right.MouseButton1Up:Connect(function() moving.Right=false end)
+
+		rs:BindToRenderStep("FreecamMovement",Enum.RenderPriority.Camera.Value,function()
+			if not db then return end
+			local cf = freecamPart.CFrame
+			local dir = Vector3.zero
+			if moving.Up then dir += cf.LookVector * speed end
+			if moving.Down then dir -= cf.LookVector * speed end
+			if moving.Left then dir -= cf.RightVector * speed end
+			if moving.Right then dir += cf.RightVector * speed end
+			freecamPart.CFrame =
+				CFrame.new(freecamPart.Position + dir)
+				* CFrame.Angles(
+					math.rad(rotation.X),
+					math.rad(rotation.Y),
+					math.rad(rotation.Z)
+				)
+			cam.CFrame = freecamPart.CFrame
+		end)
+
+	else
+		db = false
+		toggle.Text = "Off"
+		rotation = {X=0,Y=0,Z=0}
+
+		up.Parent = nil
+		down.Parent = nil
+		left.Parent = nil
+		right.Parent = nil
+		sliderX.Parent = nil
+		sliderY.Parent = nil
+		sliderZ.Parent = nil
+
+		rs:UnbindFromRenderStep("FreecamMovement")
+
+		if freecamPart then
+			freecamPart:Destroy()
+			freecamPart = nil
+		end
+
+		cam.CameraType = Enum.CameraType.Custom
+	end
+end)
+
+kill.MouseButton1Click:Connect(function()
+	gui:Destroy()
+	if freecamPart then freecamPart:Destroy() end
+	rs:UnbindFromRenderStep("FreecamMovement")
+	cam.CameraType = Enum.CameraType.Custom
+end)
