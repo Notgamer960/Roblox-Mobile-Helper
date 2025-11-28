@@ -54,8 +54,8 @@ local freecamPart
 local rotationX = 0
 local rotationY = 0
 local rotationZ = 0
-local dragging = false
-local lastPos
+local activeTouch = nil
+local lastPos = nil
 local speed = 1
 
 local function makeButton(btn,text,pos)
@@ -103,26 +103,45 @@ local function applyTextbox()
 	if z then rotationZ = clamp(z) end
 end
 
-local function startDrag(p)
-	dragging = true
-	lastPos = p
-end
-
-local function updateDrag(p)
-	if dragging and lastPos then
-		local dx = p.X - lastPos.X
-		local dy = p.Y - lastPos.Y
-		rotationY = clamp(rotationY - dx * 0.3)
-		rotationX = math.clamp(rotationX - dy * 0.3,-89,89)
+local function isInsideGui(pos)
+	local guiObjects = gui:GetDescendants()
+	for _,obj in ipairs(guiObjects) do
+		if obj:IsA("GuiObject") then
+			local abs = obj.AbsolutePosition
+			local size = obj.AbsoluteSize
+			if pos.X >= abs.X and pos.X <= abs.X + size.X and pos.Y >= abs.Y and pos.Y <= abs.Y + size.Y then
+				return true
+			end
+		end
 	end
+	return false
+end
+
+local function startTouch(id,pos)
+	if activeTouch then return end
+	if isInsideGui(Vector2.new(pos.X,pos.Y)) then return end
+	activeTouch = id
+	lastPos = Vector2.new(pos.X,pos.Y)
+end
+
+local function moveTouch(id,pos)
+	if id ~= activeTouch or not lastPos then return end
+	local p = Vector2.new(pos.X,pos.Y)
+	local d = p - lastPos
+	rotationY = clamp(rotationY - d.X * 0.3)
+	rotationX = math.clamp(rotationX - d.Y * 0.3,-89,89)
 	lastPos = p
 end
 
-local function stopDrag()
-	dragging = false
+local function endTouch(id)
+	if id == activeTouch then
+		activeTouch = nil
+		lastPos = nil
+	end
 end
 
 toggle.MouseButton1Click:Connect(function()
+
 	if db then
 		db = false
 		toggle.Text = "Off"
@@ -155,7 +174,6 @@ toggle.MouseButton1Click:Connect(function()
 	freecamPart.CFrame = cam.CFrame
 	freecamPart.Parent = workspace
 
-	rotationX,rotationY,rotationZ = 0,0,0
 	cam.CameraType = Enum.CameraType.Scriptable
 
 	makeButton(up,"Up",UDim2.new(0.1,0,0.5,0))
@@ -184,22 +202,16 @@ toggle.MouseButton1Click:Connect(function()
 	sliderY.FocusLost:Connect(applyTextbox)
 	sliderZ.FocusLost:Connect(applyTextbox)
 
-	uis.InputBegan:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-			startDrag(i.Position)
-		end
+	uis.TouchStarted:Connect(function(t)
+		startTouch(t.TouchId,t.Position)
 	end)
 
-	uis.InputChanged:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
-			updateDrag(i.Position)
-		end
+	uis.TouchMoved:Connect(function(t)
+		moveTouch(t.TouchId,t.Position)
 	end)
 
-	uis.InputEnded:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-			stopDrag()
-		end
+	uis.TouchEnded:Connect(function(t)
+		endTouch(t.TouchId)
 	end)
 
 	rs:BindToRenderStep("FreecamMove",Enum.RenderPriority.Camera.Value,function()
